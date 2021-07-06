@@ -1,0 +1,322 @@
+---
+title: "Análisis exploratorio de datos en las redes sociales"
+subtitle: "Muestreo Aleatorio Simple"
+author: "Fernando Medina López,Adriana Alavez Lujano , Ángel Daniel Gil Contreras"
+date: "30 de octubre 2020"
+output: pdf_document
+---
+El objetivo de este trabajo es analizar distintas variables de Twitter, para poder llevar a la práctica distintos conceptos de probabilidad vistos en la clase de Estadística Aplicada. Elegimos Twitter para trabajar debido a que es una red social que por su propia naturaleza es susceptible de evaluarse de muchas formas, y muchos estudios estadísticos se basan en la información obtenida de Twitter para generar indicadores sobre cualquier tema, localización, persona pública, etc. Con lo que podemos conocer las características de estas variables para investigarlas, observarlas o incluso tomar decisiones acerca de estas.
+
+Utilizamos el muestreo aleatorio simple para llevar a cabo los cálculos necesarios, sin embargo, debemos tomar en cuenta que la app de streaming nos da el 1% de los Tweets que se generan, por lo que nuestros resultados se pueden ver un poco limitados. Nos dimos a la tarea de intentar responder las siguientes preguntas:
+
+¿Cuál es el promedio de tweets por usuario en un día?
+
+¿El número total de tweets por día?
+
+¿Cómo estimamos el número de seguidores de una usuario?
+
+
+```{r setup, include=TRUE, message = FALSE, warning = FALSE}
+knitr:: opts_chunk$set (echo = TRUE )
+library(rtweet) #Para extraer datos de Twitter
+library(lubridate) #Para fechas
+library(ggplot2) #Para gráficas
+library(readr) #Para leer la base de datos
+library(kableExtra) #Para hacer tablas
+library(knitr) #Para formato PDF
+library(dplyr, warn.conflicts = FALSE) #Para las advertencias de r
+library(tinytex)
+```
+
+## Acceso a la API
+
+Para poder acceder a los datos de Twitter tuvimos que solicitar un permiso para utilizar la API y este es nuestro acceso:
+
+```{r setup, include=TRUE, message = FALSE, warning = FALSE}
+knitr:: opts_chunk$set (echo = TRUE )
+
+create_token(
+  app = "Adranfer",
+  consumer_key = "xxxxxxxxxxx",
+  consumer_secret = "xxxxxxxx",
+  access_token = "xxxxxxxxx",
+  access_secret = "xxxxxxxxxxx"
+)
+```
+
+### Recolección de muestra
+
+Tomamos una muestra con la función stream_tweets de la libreria rtweet de 60 segundos de duración y lo repetimos siete veces para poder tener una muestra lo suficientemente representativa.
+```{r, include=TRUE}
+
+#prueba_piloto1 <- stream_tweets(
+#  q = "",
+#  timeout = 60,
+#)
+
+#usuarios1 <- c(prueba_piloto1$screen_name)
+
+#------------------2------------------
+#prueba_piloto2 <- stream_tweets(
+ # q = "",
+  #timeout = 60,
+#)
+#------------------3------------------
+#prueba_piloto3 <- stream_tweets(
+ # q = "",
+  #timeout = 60,
+#)
+#------------------4------------------
+#prueba_piloto4 <- stream_tweets(
+ # q = "",
+  #timeout = 60,
+#)
+#------------------5------------------
+#prueba_piloto5 <- stream_tweets(
+ # q = "",
+  #timeout = 60,
+#)
+#------------------6------------------
+#prueba_piloto6 <- stream_tweets(
+ # q = "",
+  #timeout = 60,
+#)
+#------------------7------------------
+#prueba_piloto7 <- stream_tweets(
+ # q = "",
+  #timeout = 60,
+#)
+```
+
+
+Juntamos todas las muestras en una sola matriz e identificamos los usuarios únicos para que no se repitieran
+```{r setup, include=TRUE, warning = FALSE, error=TRUE}
+#Aquí unimos todas las muestras
+piloto <- rbind(prueba_piloto1,prueba_piloto2,prueba_piloto3,prueba_piloto4,prueba_piloto5,prueba_piloto6,prueba_piloto7)
+
+#Guardamos la tabla
+#saveRDS(piloto, file="piloto.rds")
+#Extrajimos
+usuarios <- piloto$screen_name
+#Quitamos los duplicados
+usuarios <- usuarios[!duplicated(usuarios)]
+
+```
+
+### Extracción de timeline de usuarios
+
+Obtuvimos los últimos 220 tweets de cada usuario para después filtrarlos por fecha y contarlos para obtener el promedio.
+```{r setup, include=TRUE, warning = FALSE, error=TRUE}
+#Extrajimos los últimos 220 tweets de cada usuario
+test <- get_timeline(usuarios, n=220)
+
+#Cambiamos el formato de la fecha
+test <- test %>% mutate(fecha = date(created_at))
+#Filtramos por fecha y nombre de usuario
+test <- test %>%  select(c("fecha","screen_name")) 
+
+#saveRDS(test,file ="test_bueno.rds")
+
+#Acotamos las fechas
+test <- filter(test,fecha<="2020-10-24" & fecha>="2020-10-21")
+#Contamos el número de usuarios que tuitearon en esos días
+testA1 <- test %>% group_by(screen_name) %>% tally()
+#Sacamos el promedio 
+testA1 <- testA1 %>% mutate(promedio = n/4 )
+
+#saveRDS(testA1,file = "TestA1.rds")
+
+#Completamos el data frame con ceros para obtener el total de la muestra
+z<-data.frame(screen_name = sample(c(1:17274), size = 17274),
+              n=sample(c(0:0), size = 17274, replace = TRUE),
+              promedio=sample(c(0:0), size = 17274, replace = TRUE))
+
+piloto_total <- rbind(testA1,z)
+
+```
+
+# ¿Cuál es el promedio de tweets por usuario en un día?
+
+Utilizamos las siguientes formulas para obtener nuestro promedio de tweets y el invervalo de confianza
+
+x_barraS: promedio de tweets por usuario al día
+$\bar x_s = \frac{1}{n}\sum x_i$ donde xi es el número de tweets que escribe cada usuario de la muestra
+Varianza:
+$VAR(\hat t) = S^2\frac{N-n}{Nn}$
+Error:
+$\epsilon = Z_{1-\frac{\alpha}{2}} \sqrt{VAR(\hat t)}$
+Intervalos de confianza:
+$IC = [\hat t\pm\epsilon]$
+
+
+```{r, include= TRUE, warning = FALSE, error=TRUE}
+#Intervalo de confianza
+N <- 340000000 #De acuerdo a https://yiminshum.com/twitter-digital-2020/ el número de usuarios registrados en Twitter es de 340 000 000 para el año 2020
+
+#El total de nuestra muestra fue:
+n <- 18425
+#Calculamos la desviación estandar
+S <- sd(piloto_total$promedio)
+#Calculamos Z
+Zalpha <- qnorm(1-.05/2)
+#Calculamos x_barraS, que es el promedio
+x_barraS <- (1/n)*sum(piloto_total$promedio)
+#Calculamos la varianza
+varianza <- (S^2)*((N-n)/(N*n))
+#Calculamos el error
+E <- Zalpha*((varianza)^(1/2))
+#Calculo de los intervalos de confianza
+Intervalo_Min <- c(x_barraS-E)
+Intervalo_Max<- c(x_barraS+E)
+
+Tabla <- data.frame(Intervalo_Min,Intervalo_Max,x_barraS)
+
+kable(Tabla,booktabs = T) %>% kable_styling(latex_options = "striped")
+```
+
+
+### ¿El número total de tweets por día?
+
+Ahora vamos a estimar el total de tweets por día. De acuerdo a https://www.dsayce.com/social-media/tweets-day/#:~:text=Every%20second%2C%20on%20average%2C%20around%206%2C000%20tweets%20are%20tweeted%20on,200%20billion%20tweets%20per%20year el promedio de tweets por día (en el año 2016) fue de 661 000 000
+
+Utilizaremos el T_estimador:
+$\hat t = N \bar x_s$
+
+```{r, include=TRUE, warning=FALSE, error=TRUE}
+#Para obtener el total de tweets por día usaremos el x_barraS del ejercicio anterior, junto con el total de usuarios N=340 000 000. 
+
+#De este modo tenemos que:
+T_estimador <- N*x_barraS
+
+#Ahora sacaremos los intervalos de confianza
+
+Zalpha <- qnorm(1-.05/2)
+
+varianza1 <- (N^2)*((S^2)*((N-n)/(N*n)))
+
+E1 <- Zalpha*((varianza1)^(1/2))
+
+Intervalo_de_Confianza_Min <- c(T_estimador-E1)
+Intervalo_de_Confianza_Max <- c(T_estimador+E1)
+
+#Tabla
+Tablita <- data.frame(Intervalo_de_Confianza_Min,Intervalo_de_Confianza_Max,T_estimador)
+
+kable(Tablita,booktabs = T) %>% kable_styling(latex_options = "striped")
+
+```
+
+### ¿Cómo estimamos el número de seguidores de una usuario?
+
+Vamos a contestar la pregunta de ¿cuántos followers tiene el ITAM en Twitter? Sabemos que el número de usuarios del ITAM es de 58,752. Conceptualmente queremos estimar Ngorro. Y calcularemos el número de followers por medio del método de captura y recaptura.
+
+```{r, include=TRUE,error=TRUE}
+#Tomamos una base creada de la siguiente forma:
+#data <- get_followers("ITAM_mx",n=58752,page=-1,retryonratelimit = TRUE)
+saveRDS(data,file="Datos_usuariosITAM.rds")
+data <- read_rds("~/Desktop/ ProyectoAplicada/Datos_usuariosITAM.rds")
+#Número total de usuarios
+N1 <- length(data$user_id)
+```
+
+Aplicando el método de captura y recaptura: 
+
+$\hat N = \frac{nl}{k}$
+
+```{r}
+#Calculamos intervalos de confianza al 95% y preparamos los datos
+l <- 7000
+n1 <- 7000
+nsim <- 100
+Ngorro <- rep(NA,nsim)
+ic_1 <- rep(NA,nsim)
+ic_2 <- rep(NA,nsim)
+Z <- qnorm(1-.05/2)
+
+for (i in 1:nsim) {
+  #capturamos l=7000 datos
+  captura <- sample(data$user_id,size = l)
+  captura <- data.frame(captura)
+  colnames(captura) <- "usuario"
+  #Recapturamos n=7000 datos
+  recaptura <- sample(data$user_id,size = n1)
+  recaptura <- data.frame(recaptura)
+  colnames(recaptura) <- "usuario"
+  #Comparamos los datos para ver los repetidos
+  repetidos <- captura %>% rbind(recaptura)
+  repetidos <- repetidos %>% group_by(usuario) %>% tally()
+  repetidos <- repetidos %>% filter(n==2)
+  #Calculamos nuestro estimador del total
+  k <- length(repetidos$usuario)
+  Ngorro[i] <- n1*l/k
+  #Calculamos los intervalos de confianza
+  varNgorro <- (n1*l/k)^2*(l-k)/(k*(l-1))
+  ic <- Z*sqrt(varNgorro)
+  ic_1[i] <- Ngorro[i] - ic
+  ic_2[i] <- Ngorro[i] + ic
+}
+
+#Hacemos un data.frame con los datos obtenidos 
+simulaciones <- data.frame(
+  sim <- 1:nsim,
+  intervalo_1 <- ic_1,
+  intervalo_2 <- ic_2,
+  estimador <- Ngorro
+)
+
+#Calculamos el promedio de los estimadores
+total_poblacional <- mean(simulaciones$estimador....Ngorro)
+
+Total.poblacional <-data.frame(total_poblacional)
+
+kable(Total.poblacional,booktabs = T) %>% kable_styling(latex_options = "striped")
+```
+
+
+### Gráfica de los invervalos de confianza del total poblacional
+
+
+```{r, include=TRUE}
+#Graficamos: nuestro estimador, intervalos de confianza y el valor real
+ggplot(simulaciones)+
+  geom_point(aes(x=sim,y=estimador),color = "red")+
+  geom_errorbar(aes(x=sim,ymin=intervalo_1,ymax=intervalo_2))+
+  geom_hline(aes(yintercept = N1),lty="dashed",color="blue")+
+  labs(title = "Estimación del número total de seguidores de",
+       subtitle = "ITAM_mx", x ="Número de simulación",
+       y="Estimación"
+  )
+```
+
+## Conclusión
+
+Este proyecto fue un reto para nosotros, sin embargo, logramos aprender muchas cosas sobre el análisis exploratorio de datos en las redes sociales y específicamente en Twitter y como el muestreo aleatorio simple tiene sus limitaciones por los permisos que se otorgan para extraer datos. Son temas muy interesantes en los que sin duda para poder hacerlo más detallado se tiene que profundizar muchísimo más. 
+
+ 
+También nos sirvió no solo para desarrollar los conceptos vistos en clase, sino para explorar distintas formas de pensar para llegar a las variables que estábamos buscando, ya que aunque parezca que solo hay una forma nos encontramos a que cada uno podía plantearlo de forma distinta. El manejo de todos estos datos nos hicieron ver que podemos llegar a tener distintos prejuicios que podrían llegar a afectar nuestro análisis estadístico si no se hace de la manera adecuada como suponer que como máximo un usuarios promedio hace 50 tweets, pero al filtrarlos nos sorprendimos de lo equivocados que estábamos. Es por esto que consideramos que fue un gran ejercicio tanto de conocimientos como de análisis.
+
+## Bibliografía
+
+CRAN. (9 de Enero de 2020). Recuperado el 23 de octubre de 2020. Obtenido de https://cran.r-project.org/web/packages/rtweet/rtweet.pdf
+
+Datahack. (2 de octube de 2018). Recuperado el 23 de octubre de 2020. Obtenido de https://www.datahack.es/analisis-datos-twitter-r-empezar/
+
+Gustavo, M. (11 de marzo de 2016). Youtube. Recuperado el 23 de octubre de 2020. Obtenido de Youtube: https://www.youtube.com/watch?v=GWgFlJsPdFI
+
+Huneeus, S. (2020).Recuperado el 23 de octubre de 2020. Obtenido de Git Hub: https://arcruz0.github.io/libroadp/qta.html
+
+Rodrigo, J. A. (diciembre de 2017). RPubs. Recuperado el 23 de octubre de 2020. Obtenido de RPubs: https://rpubs.com/Joaquin_AR/334526
+
+Rosana Ferrero, J. L. (2020). Máxima formación.Recuperado el 23 de octubre de 2020. Obtenido de Máxima formación: https://www.maximaformacion.es/blog-dat/como-leer-guardar-informacion-en-r/#id2
+
+Sayce, D. (2020). Dsayce. Recuperado el 23 de octubre de 2020. Obtenido de David Sayce: https://www.dsayce.com/social-media/tweets-day/#:~:text=Every%20second%2C%20on%20average%2C%20around%206%2C000%20tweets%20are%20tweeted%20on,200%20billion%20tweets%20per%20year
+
+Shum, Y. M. (1 de marzo de 2020). Yim Min Shum. Recuperado el 23 de octubre de 2020. Obtenido de Yi Min Shum Xi: https://yiminshum.com/twitter-digital-2020/
+
+Hernández, F. (2019). GitHub. Recuperado el 30 de octubre de 2020, de Manual de R: https://fhernanb.github.io/Manual-de-R/ic.html
+
+Profesores del Departamento de Ciencias Matemáticas e Informática de la UIB . (18 de marzo de 2020). Aprender R: Parte 2 . Recuperado el 23 de octubre de 2020, de GitHub: https://aprender-uib.github.io/AprendeR2/extras-de-r-markdown.html#tablas
+
+Zepeda-Tello, R. (29 de Octubre de 2020). Estadística I: Análisis exploratorio de datos y muestreo. Recuperado el 30 de Octubre de 2020, de GitHub: https://rodrigozepeda.github.io/LibroEstadistica/an%C3%A1lisis-exploratorio-de-datos.html
+
+
