@@ -1,0 +1,328 @@
+---
+title: "Proyecto Estadística Aplicada 1"
+author: "Fernando Medina López, Luis Samuel Sánchez  " 
+date: "15/09/2020"
+output: html_document
+---
+
+
+
+\       
+
+
+#### Para instalar la libreria meme, debes instalar XQUARTZ
+#### Vamos a abrir las librerias que usaremos 
+#### Paquetes requeridos:
+###### library(readr) #Para leer datos
+###### library(tidyverse) #Libreria de análisis de datos
+###### library(lubridate) #Para las fechas
+###### library(dplyr)
+###### library(knitr)
+###### library(meme) #para meme
+###### library(sysfonts) #para meme
+
+
+##### Lectura de la base de datos
+###### data <- read.csv(file = "/Users/fernando/Desktop/ ProyectoAplicada/hechos-de-transito-reportados-por-ssc-base-comparativa.csv", header = TRUE, stringsAsFactors = TRUE) #con header le digo que el primer renglon son los nombres de mis variables
+
+```{r, include=FALSE}
+
+#Para instalar la libreria meme, debes instalar XQUARTZ
+#Vamos a abrir las librerias que usaremos 
+library(readr) #Para leer datos
+library(tidyverse) #Libreria de análisis de datos
+library(lubridate) #Para las fechas
+library(dplyr)
+library(knitr)
+library(meme) #para meme
+library(sysfonts) #para meme
+
+data <- read.csv(file = "/Users/fernando/Desktop/ ProyectoAplicada/hechos-de-transito-reportados-por-ssc-base-comparativa.csv", header = TRUE, stringsAsFactors = TRUE) #con header le digo que el primer renglon son los nombres de mis variables
+```
+
+
+\ 
+
+
+### Descripción de la base de datos
+Para este proyecto analizamos la base de datos sobre _Los hechos de tránsito registrados por la Secretaria de Seguridad Ciudadana del año 2018_ disponible en el portal de datos del gobierno de la Ciudad de México https://datos.cdmx.gob.mx/explore/dataset/hechos-de-transito-reportados-por-ssc-base-comparativa/export/?refine.ano_evento=2018. 
+Esta base de datos incluye, entre otras variables, la fecha del evento, accidentes por alcanldía, el tipo de evento, las coordenadas, los tipos de vehículos involucrados, características de las personas fallecidas o lesionadas, la fecha de los accidentes, la edad y la unidad médica de apoyo. Cada fila corresponde a un hecho de tránsito.
+
+\ 
+
+
+## Número total de accidentes por agente (ocurridos en el año 2018)
+A continuación presentamos el total de accidentes por agente de tránsido, a lo largo del 2018.
+```{r , include = TRUE}
+
+#Definimos una variable donde contamos los accidentes por cada agente de tránsito.
+conteo_identidad <- data %>% group_by(IDENTIDAD) %>% count()
+
+#Para la paleta de colores de las barras de la gráfica
+mis_colores <- colorRampPalette(c("#ff9999", "#99ff99", "#9999ff"))
+
+#Graficamos 
+ggplot(conteo_identidad) +
+  geom_col(aes(x = reorder(IDENTIDAD,+n), y= n), fill = mis_colores(5)) + coord_flip() +
+  xlab("Agente") +
+  ylab("Número de accidentes") + 
+  ggtitle("Número total de accidentes por agente (ocurridos en el año 2018)") +
+  theme_grey()
+```
+
+
+Los motociclistas son los agentes de tránsito más afectados, como se puede observar en la gráfica, seguidos por los peatones. 
+
+
+## Accidentes de motociclista por día
+Accidentes promedio por día de motociclistas, es el agente que más accidentes presentó el año 2018. 
+```{r, include=TRUE}
+
+#Seleccionamos al agente Motociclista y contamos el número de accidentes por día.
+Motociclista <- filter(data, IDENTIDAD %in% c("MOTOCICLISTA"))
+Motociclista <- Motociclista %>% mutate(fecha_definida = ymd(FECHA.EVENTO))
+conteo_motociclista <- Motociclista %>% group_by(fecha_definida) %>% tally()
+
+
+
+ggplot(conteo_motociclista) +
+  geom_violin(aes(x = 0, y = n ), color = "orange", fill ="yellow") +
+  geom_boxplot(aes(y=n), color = "black", fill = "white" ) +
+  geom_point(aes(x = 0, y= n), color = "orange") +
+  theme_minimal() +
+  labs(
+    title = "Número promedio de accidentes de motociclista por día",
+    y= "Número de motociclistas accidentados por día",
+    x= " "
+  )
+```
+
+
+Los motociclistas son los que se accidentan más como vimos en la gráfica pasada. De acuerdo a ésta gráfica, hay aproximadamente 14 accidentes de motociclistas por día. Sin embargo, hay días en los que ocurren más de 30 accidentes de motociclistas. 
+
+
+
+## Distribución de accidentes a lo largo del 2018
+
+```{r, include=TRUE}
+
+#vamos a leer la fecha como entero porque R lo lee como str, esta funcion pertenece a la paqueteria lubridate
+data <- data %>% mutate(fecha_definida = ymd(FECHA.EVENTO)) #con esto me agregó hasta el ultimo una nueva columna llamada fecha_nueva 
+
+
+conteo_accidentes <- data %>% group_by(fecha_definida) %>% tally()
+
+ggplot(data) +
+  geom_histogram(aes(x = fecha_definida, y = ..density..), fill = "#99C1D0", color = "white", bins = 30 ) +
+  geom_density(aes(x= fecha_definida), color = "#33BD76", size = 1, kernel = "gaussian") +
+  theme_minimal() +
+  xlab("Mes") +
+  ylab("Densidad") +
+  ggtitle("Distribución de accidentes por mes registrados CDMX (2018)")
+
+```
+
+
+Vemos que la mayor parte de los accidentes del año 2018 se concentraron después de la mitad de año. 
+
+
+
+
+## Número de Accidentes por día
+Contabilizamos el número de accidentes de tránsito que hay por día de la semana.
+```{r, include = TRUE}
+#contamos el total de accidentes por día de la semana
+conteo_diaevento <- data %>% group_by(DIA_EVENTO) %>% count()
+
+#Vamos a ordenar los días de la semana con factor()
+dias_ordenados <- factor(conteo_diaevento$DIA_EVENTO, order = TRUE, levels = c("lunes","martes","miércoles","jueves","viernes","sábado","domingo"))
+
+ggplot(conteo_diaevento)+
+  geom_point(aes(x = dias_ordenados, y = n), size = 4, color = "blue", pch = 23, bg = "green") +
+  theme_gray() + xlab("Día de la semana") + ylab ("Número de accidentes") + 
+  ggtitle("Número de accidentes de tránsito por día") 
+
+
+```
+
+Como se puede observar, hay un incremento en los accidentes de tránsito conforme se acerca el fin de semana. Vemos por ejemplo, que el día viernes es cuando más accidentes de tránsito se reportan. Esto se lo podemos adjudicar al bien conocido viernes social. 
+
+
+
+
+## Procentaje de accidentes diarios a lo largo del año 2018
+
+```{r, nclude = TRUE}
+
+#contamos los accidentes por mes
+conteo_accidentes <- data %>% group_by(fecha_definida = ymd(FECHA.EVENTO)) %>% tally()
+
+
+#Agregamos una columna a conteo_accidentes_pormes con el porcentaje de accidentes por mes
+conteo_accidentes$Porcentaje <-prop.table(conteo_accidentes$n)
+conteo_accidentes$Porcentaje <- round(prop.table(conteo_accidentes$n),365)*100
+
+
+
+ggplot(conteo_accidentes) +
+  geom_line(aes(x = fecha_definida, y = Porcentaje ), color = "red") +
+  geom_point(aes(x = fecha_definida,y = Porcentaje), color = "blue") +
+  theme(axis.text.x = element_text(angle=45,size=6)) +
+  labs(
+    title ="Porcentaje de accidentes de tránsito por día (año 2018)",
+    x = "Mes",
+    y = "Porcentaje de accidentes por día"
+  )
+
+
+```
+
+
+Como podemos observar, a lo largo del año 2018, el procentaje de accidentes por día se fue incrementando considerablemente. Es posible que esto se presente debido a que en ese medio año, a partir del 15 de Septiembre, hay un mayor número de días festivos. 
+
+
+
+
+## Accidentes promedio por cada agente de tránsito
+Aquí podemos observar el número de accidentes diario promedio por cada agente de tránsito. Se incluye también el promedio de accidentes totales por día.
+```{r, include = TRUE}
+
+#Contamos el número de accidentes por cada agente
+
+Motociclista <- filter(data, IDENTIDAD %in% c("MOTOCICLISTA"))
+Motociclista <- Motociclista %>% mutate(fecha_definida = ymd(FECHA.EVENTO))
+conteo_motociclista <- Motociclista %>% group_by(fecha_definida) %>% tally()
+
+Peaton <- filter(data, IDENTIDAD %in% c("PEATON"))
+Peaton <- Peaton %>% mutate(fecha_definida = ymd(FECHA.EVENTO))
+conteo_peaton <- Peaton %>% group_by(fecha_definida) %>% tally()
+
+Pasajero <- filter(data, IDENTIDAD %in% c("PASAJERO"))
+Pasajero <- Pasajero %>% mutate(fecha_definida = ymd(FECHA.EVENTO))
+conteo_pasajero <- Pasajero %>% group_by(fecha_definida) %>% tally()
+
+Conductor <- filter(data, IDENTIDAD %in% c("CONDUCTOR"))
+Conductor <- Conductor %>% mutate(fecha_definida = ymd(FECHA.EVENTO))
+conteo_conductor <- Conductor %>% group_by(fecha_definida) %>% tally()
+
+Ciclista <- filter(data, IDENTIDAD %in% c("CICLISTA"))
+Ciclista <- Ciclista %>% mutate(fecha_definida = ymd(FECHA.EVENTO))
+conteo_ciclista <- Ciclista %>% group_by(fecha_definida) %>% tally()
+
+#Calculamos la media de los accidentes por agente
+media_accidmoto <- mean(conteo_motociclista$n)
+
+media_accidpeat <- mean(conteo_peaton$n)
+
+media_accidpasaj <- mean(conteo_pasajero$n)
+
+media_accidcond <- mean(conteo_conductor$n)
+
+media_accidciclis <- mean(conteo_ciclista$n)
+
+media_accidentespordia <- mean(conteo_accidentes$n)
+
+Media_por_día <- c(media_accidmoto, media_accidpeat, media_accidcond, media_accidpasaj,media_accidciclis,media_accidentespordia)
+
+Agentes <- c("Motociclista","Peaton","Conductor","Pasajero","Ciclista", "Media total")
+
+tablita <- data.frame(Agentes,Media_por_día)
+
+
+kable(tablita, booktabs = T)
+
+
+```
+
+
+
+
+
+## Distribución de Atropellados
+
+```{r, include= TRUE}
+
+data <- data %>% mutate(fecha_definida = ymd(FECHA.EVENTO))
+
+conteo_tipo <- data %>% filter(TIPO.DE.EVENTO %in% c("ATROPELLADO"))
+
+ggplot(conteo_tipo) + 
+  geom_area(aes(x = fecha_definida, y = ..density..), stat = "bin", color = "red", fill = "skyblue", bins = 30) +
+   labs(
+    title ="Distribución de atropellados",
+    x = "Mes",
+    y = "Densidad"
+  )
+  
+
+```                                                                           
+
+
+Muchos accidentes a lo largo del año implican no solamente vehículos sino también puede ocurrir que existan personas atropelladas y es lo que esta gráfica nos muestra, podemos notar queal final del año es cuando mas incidentes como este ocurre, en cuanto abril se muestra como el mes con menor personas atropelladas.
+
+## Accidentes ocurridos en cada alcaldía
+
+```{r, include=TRUE}
+conteo_alcaldia <- data %>% group_by(ALCALDÍA) %>% count()
+ggplot(conteo_alcaldia) + 
+  geom_jitter(aes(x = ALCALDÍA, y = n), color = "purple", fill = "white", size = 5) + 
+  xlab("Alcaldía") +
+  ylab("Número de accidentes") + 
+  ggtitle("Accidentes ocurridos en cada alcaldía") +
+  theme(axis.text.x = element_text(angle=90 ,size=5)) 
+
+```
+
+
+Como se puede observar en la gráfica, el número de accidentes puede variar según la alcaldía, por ejemplo, podemos notar que en la alcaldía Cuauhtemoc hubieron cerca de 3,000 accidentes y en Milpa Alta no sobrepasaron los 100 en todo el año.
+
+## Fallecimientos por accidente
+
+```{r, include=TRUE}
+data <- data %>% mutate(fecha_definida = ymd(FECHA.EVENTO))
+
+conteo_occisos <- data %>% filter(TOTAL.OCCISOS <= 10 & TOTAL.OCCISOS >= 1)
+
+ggplot(conteo_occisos) + 
+  geom_freqpoly(aes(x = TOTAL.OCCISOS), color = "orange", fill = "grey", size = 3, bins= 30) +
+  xlab("Número de occisos por accidente") +
+  ylab("Suma de accidentes") + 
+  ggtitle("Fallecimientos por accidente")
+```
+
+
+Desgraciadamente cuando se habla de accidentes cabe la posibilidad de que haya pérdidas humanas y es lo que esta gráfica nos muestra, entre los accidentes ocurridos en el 2018 los que tuvieron personas fallecidas, la mayoría de los casos solamente fue una persona muerta mientras que solamente en una ocasión hubieron 10 occisos.
+
+## Número de lesionados por accidente
+
+```{r, include=TRUE}
+Lesionados <- filter(data, TOTAL.LESIONADOS %in% c(""))
+
+conteo_lesionados <- data %>% group_by(TOTAL.LESIONADOS) %>% count()
+
+ggplot(conteo_lesionados) +
+   geom_point(aes(x=0,y=TOTAL.LESIONADOS)) +
+   geom_boxplot(aes(y=TOTAL.LESIONADOS), color = "black", fill = "red") + 
+
+  labs(
+    title="Número de lesionados por accidente", 
+    x="",
+    y="Personas lesionadas",
+    caption="Datos de la AIP"
+
+  )
+```
+
+
+
+Esta gráfica es parecida a la pasada solo que en esta ocasión nos muestra los lesionados por accidente. Podemos ver que en promedio hay 7 lesionados por accidente; sin embargo, podemos observar que hay eventos que tuvieron hasta 20 lesionados. 
+
+## Meme
+
+```{r, include=TRUE}
+
+foto <- "https://lexiconthai.com/wp-content/uploads/2019/12/e75.jpg"
+meme(foto, "Cuando te abandona tu compañero de equipo", "Un día antes de la entrega", size = 1)
+
+```
+
