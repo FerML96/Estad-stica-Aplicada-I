@@ -1,2 +1,2 @@
-# Estad-stica-Aplicada-I
+# Estadistica-Aplicada-I
 Proyectos de Análisis Exploratorio
