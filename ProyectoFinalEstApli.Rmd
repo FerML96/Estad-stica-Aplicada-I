@@ -1,0 +1,466 @@
+---
+title: "Análisis del Uso de Tecnologías de la Información de los Hogares en México "
+subtitle: "Estimadores estadísticos en bases multietápicas" 
+author: "Fernando Medina,Adriana Alavez, Ángel Gil"
+date: "5 de Diciembre de 2020"
+output: pdf_document
+---
+
+# INTRODUCCIÓN
+El objetivo de este trabajo es analizar y ayudar a entender de una forma más clara y sencilla los resultados obtenidos en la “Encuesta Nacional sobre Disponibilidad y Uso de Tecnologías de la Información en los Hogares (ENDUTIH) 2019” realizada por el INEGI. Haciendo uso de estimadoress estadísticos tales como la media poblacional, el total poblacional y la varianza. Esto debido a que con la pandemia, surge la pregunta sobre cuántos mexicanos tienen acceso a la tecnología como medio de comunicación y entretenimiento. Y esperamos que encuentre la respuesta a esta pregunta en este análisis.
+
+
+## DESCRIPCIÓN DE LA ENCUESTA
+
+### OBJETIVO DE LA ENCUESTA
+
+La encuesta seleccionada fue la ENDUTIH 2019, la cual  es un proyecto
+estadístico que busca generar información estadística que permita conocer la
+disponibilidad y el uso de las tecnologías de la información y las
+comunicaciones en los hogares y por los individuos de seis o más años que
+viven en los dominios de interés: nivel nacional, nacional urbano, nacional rural y por estrato socioeconómico
+
+### METODOLOGÍA DE LA ENCUESTA
+
+Comprende el conjunto de actividades relacionadas con la selección de la muestra, el tamaño suficiente que permita realizar estimaciones para la población objeto de estudio, el marco de muestreo, y la construcción y evaluación de las estimaciones planteadas para la expansión de la información, a partir de los datos obtenidos en campo.
+
+#### POBLACIÓN OBJETIVO: 
+
+Se define como la colección de observaciones que nos interesa medir. En este caso la ENDUTIH 2019, está dirigida a las personas de seis o más años de edad que residen permanentemente en viviendas particulares ubicadas en el territorio nacional a la fecha de la captación de información.
+
+#### MARCO MUESTRAL:
+
+Es la lista información y datos de la cual pude obtener mi muestra.
+Para la selección de la muestra de la encuesta se utilizó la Muestra Maestra obtenida del Marco Maestro de
+Muestreo 2012, este último, construido a partir de la información cartográfica y demográfica que se obtuvo del
+Censo de Población y Vivienda 2010. A partir de la Muestra Maestra se seleccionan las submuestras para todas las
+encuestas en viviendas que realiza el INEGI.
+ 
+
+#### DISEÑO DE LA MUESTRA:
+
+Se caracteriza por ser probabilístico; es decir, que se hace a través de análisis de grupos pequeños de una población, que utiliza formas de métodos de selección aleatoria. Donde todos en la población tienen la misma oportunidad de ser seleccionados. Y en consecuencia, los resultados obtenidos de la encuesta se generalizan a toda la población.
+
+
+A la vez, el diseño es: 
+
+•Trietápico: Se elabora en distintas etapas
+
+Etapa 1: Las Unidades Primarias de Muestreo están constituidas por agrupaciones de viviendas con características diferenciadas dependiendo del ámbito al que pertenecen y la entidad
+
+Etapa 2: Una vez construido el conjunto de UPM, se agrupan aquellas con características similares, lo cual se denomina
+estratificación y se selecciona la muestra
+
+Etapa 3: Se hace un muestreo para elegir a las personas dentro de la vivienda elegida en las etapas anteriores
+
+•Estratificado:los grupos (estratos) son muy homogéneos internamente y muy diferentes entre sí. En este caso  cada UPM fue clasificada en un único estrato geográfico y uno socioeconómico
+
+•Por conglomerados: Los grupos contienen toda la variabilidad de la población. Si esto sucede, podemos seleccionar únicamente algunos de estos conglomerados para conocer la información de interés del total de la población.
+
+Por lo que se mide la probabilidad de selección de una persona de seis o más años de edad del -ésimo hogar, de la j–ésima vivienda, en la i–ésima UPM, en el h–ésimo estrato, en la e–ésima entidad
+
+### METODOLOGÍA DEL ANÁLISIS: 
+
+Se calcularon tres estimadores diferentes:
+
+• Estimador de la Media de los hogares en México que cuentan con energía eléctrica en sus viviendas 
+
+• Estimador del Total poblacional de los mexicanos que tienen acceso a internet
+
+• Estimador de la Varianza del tiempo que los mexicanos pasan en internet al día
+
+## DESAROLLO DEL PROYECTO
+
+```{r setup, include=TRUE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+library(survey) #Para el diseño
+library(tidyverse)
+library(tinytex)
+library(knitr) #Para formato PDF
+library(dplyr, warn.conflicts = FALSE)
+
+#Leemos las bases necesarias
+Hogar <- read.csv("/Users/fernando/Desktop/Hogar.csv")
+Usuario <- read.csv("/Users/fernando/Desktop/Usuario.csv")
+Vivienda <- read.csv("/Users/fernando/Desktop/Vivienda.csv")
+
+
+```
+
+
+### Media de los hogares en México que cuentan con energía eléctrica en sus viviendas
+
+Este estimador nos pareció muy interesante, porque nos ayudará a ver que tantos mexicanos se han quedado resagados en esta cuarentena. Ya que el acceso a la energía eléctrica se ha vuelto indispensable. Además de que nos ayudará a saber si pueden usar tecnología en su hogar o en otros espacios, esto debido a que muchas vecesa la energía eléctrica da paso a otras herramientas de comunicación como la señal de teléfono, antenas de televisión, etc. 
+
+Para el cálculo de este estimador se utiliza la siguiente fórmula:
+$\hat{\bar{x}} = \frac{1}{N} \sum \frac{t_i}{\pi}$
+
+Para el cálculo del intervalo de confianza se utiliza la siguiente fórmula:
+$\epsilon = Z_{1-\frac{\alpha}{2}} \sqrt{VAR(\hat{\bar{x}})}$
+
+$[\hat{\bar{x}} \pm\epsilon ]$
+
+```{r, include=TRUE}
+
+#Vamos a hacer un ID para identificar a cada usuario
+Vivienda <- Vivienda %>%
+  mutate(id = paste0(UPM, "_",VIV_SEL))
+
+#Hacemos una columna donde se encuentran los que cuentan con energía electrica
+Vivienda <- Vivienda %>%
+  mutate(Energia = ifelse(P1_4 == 1,1,0))
+
+#Hacemos el diseño para extenderlo a la población
+diseño_viv <- svydesign(id = ~id, strata = ~EST_DIS, weights = ~FAC_VIV,
+                    PSU = ~UPM, data = Vivienda, nest=TRUE)
+
+
+#----------------Media Poblacional-Energia---------------------
+
+
+#Media poblacional de los que tienen energia electrica en México
+media_energia <- svymean(~Energia,diseño_viv) 
+
+#Intervalos de confianza
+max_energia <- confint(media_energia)[2]
+min_energia <- confint(media_energia)[1]
+
+estimado_energia <- paste0("Media: ",media_energia[1]*100,"%")
+
+intervalo_energia <- paste0("Intervalos: [", round(min_energia*100,2), "%, ",
+                            round(max_energia*100,2),"%]")
+
+
+error_energia <- paste0("Error: ",((max_energia - min_energia)/2)*100, " %")
+
+
+print(estimado_energia)
+print(intervalo_energia)
+print(error_energia)
+
+
+```
+
+
+
+
+### Total poblacional de los mexicanos que tienen acceso a internet 
+
+Este estimador nos pareció interesante ya que a partir de la muestra podemos analizar en que medida los mexicanos tienen acceso a internet sin importar el entorno en el que se encuentren, ya sea de manera gratuita o privada. Y nos podría ayudar también a saber en que partes se tiene que trabajar para poder brindar este servicio a más personas y en más lugares
+
+Para el cálculo de este estimador se utiliza la siguiente fórmula:
+$\hat t = \sum \frac{t_i}{\pi}$
+
+Para el cálculo del intervalo de confianza se utiliza la siguiente fórmula:
+$\epsilon = Z_{1-\frac{\alpha}{2}} \sqrt{VAR(\hat t)}$
+
+$[\hat t\pm\epsilon ]$
+
+```{r, include=TRUE}
+
+
+#Vamos a hacer un ID para identificar a cada usuario
+Hogar <- Hogar %>%
+  mutate(id = paste0(UPM, "_",VIV_SEL))
+
+
+#Hacemos una columna donde se encuentran los que cuentan con Internet
+Hogar <- Hogar %>%
+  mutate(Internet = ifelse(P4_4 == 1,1,0))
+
+#Hacemos el diseño para extenderlo a la población
+diseño_hog <- svydesign(id = ~id, strata = ~EST_DIS, weights = ~FAC_HOG,
+                    PSU = ~UPM, data = Hogar, nest=TRUE)
+
+#----------------Total Poblacional de los que tienen Internet-------------------
+
+
+
+#Total poblacional de los que tienen Internet
+total_internet <- svytotal(~Internet,diseño_hog) 
+
+max_internet <- confint(total_internet)[2]
+min_internet <- confint(total_internet)[1]
+
+estimado_internet <- paste0("Total: ",total_internet[1])
+
+#Intervalos de confianza
+intervalo_internet <- paste0("Intervalos: [", round(min_internet,2), ", ",
+                             round(max_internet,2),"]")
+
+#Error
+error_internet <- paste0("Error: ",(max_internet - min_internet)/2)
+
+
+print(estimado_internet)
+print(intervalo_internet)
+print(error_internet)
+
+```
+
+### Gráfica 1: Muestra de hogares con internet vs sin internet
+
+```{r, include=TRUE}
+#Graficamos de nuestra muestra, los que tienen invernet v.s los que no tienen internet
+
+#Graficando
+ggplot(Hogar) +
+  geom_bar(aes(x=Internet), fill = "skyblue", color = "black") +
+  labs(
+    title ="Muestra de hogares con internet vs hogares sin internet",
+    x ="Sin Internet                                       Internet",
+    y = "No. de Personas"
+  )
+```
+
+
+### Gráfica 2: Total de hogares con internet vs sin internet  
+
+```{r, include=TRUE}
+#Calcularemos ahora el total poblacional de los que 
+#no tienen internet para graficar los hogares que tienen 
+#internet vs los que no tienen internet
+
+#Vamos a hacer un ID para identificar a cada usuario
+Hogar <- Hogar %>%
+  mutate(id = paste0(UPM, "_",VIV_SEL))
+
+
+#Hacemos una columna donde se encuentran los que NO cuentan con Internet
+Hogar <- Hogar %>%
+  mutate(NO_Internet = ifelse(P4_4 == 2,1,0))
+
+#Hacemos el diseño para extenderlo a la población
+diseño_hog <- svydesign(id = ~id, strata = ~EST_DIS, weights = ~FAC_HOG,
+                    PSU = ~UPM, data = Hogar, nest=TRUE)
+
+#----------------Total Poblacional de los que NO tienen Internet-----------------
+
+#Total poblacional de los que tienen Internet
+total_nointernet <- svytotal(~NO_Internet,diseño_hog)
+
+
+#--------------------------GRAFICA--------------------
+
+#Graficando el total de los que no tienen internet vs los que si tienen
+
+#Creamos una base para juntar ambos totales y así poderlos graficar
+Graf_Int <- data.frame(names=c("Internet","Sin Internet"),
+                       values=c(total_internet/1000000,total_nointernet/1000000))
+
+#Gradicando total poblacional (Internet vs No Internet)
+ggplot(Graf_Int,aes(x=names,y=values))+
+  geom_bar(stat = "identity", color = "#1D4D6F", fill = "#408CC1") +
+  labs(
+    title ="Total de hogares con internet vs hogares sin internet",
+    x = "",
+    y = "No. de Hogares (en millones)"
+  )
+
+  
+
+
+
+```
+
+
+
+
+
+
+
+### Varianza del tiempo que los mexicanos pasan en internet al día 
+
+Este estimador nos pareció muy interesante, porque creemos que la varianza será grande debido a los diferentes oficios de las personas mexicanas, la diferencia de edades y de las generaciones. También es importante conocer que tan dispersos están los datos para poder ver que tan fiables van a ser los cálculos de estimadores que impliquen esta misma variable.
+
+Para el cálculo de este estimador se utiliza la siguiente fórmula:
+
+$S^{2} = \frac{1}{n_1 - 1} \sum \ (t_i - \bar t_S)$
+
+Para el cálculo del intervalo de confianza se utiliza la siguiente fórmula:
+
+$\epsilon = Z_{1-\frac{\alpha}{2}} \sqrt{VAR(S^2)}$
+
+$[S^2\pm\epsilon ]$
+
+
+```{r, include=TRUE}
+
+#-------------Estimador Varianza---------
+
+#Haremos el id para la base Usuario
+Usuario <- Usuario %>%
+  mutate(id = (paste0(VIV_SEL, "_",NUMREN)))
+
+#Cambiamos a tipo número la columna P7_4
+Usuario <- Usuario %>% mutate(P7_4 = as.numeric(P7_4))
+#Quitamos los NA
+Usuario <- Usuario %>% dplyr::mutate(Tiempo_Internet = replace_na(P7_4, 0))
+
+#Diseño (siempre correr si modificas la base)
+diseño_us <- svydesign(id = ~id, strata = ~EST_DIS, weights = ~FAC_PER,
+                    PSU = ~UPM, data = Usuario, nest=TRUE)
+
+
+
+
+#Varianza de horas que pasan los mexicanos en Internet
+varianza_Hrsint <- svyvar(~Tiempo_Internet,diseño_us) 
+
+max_hrsint <- confint(varianza_Hrsint)[2]
+min_hrsint <- confint(varianza_Hrsint)[1]
+
+estimado_hrsint <- paste0("Varianza: ",round(varianza_Hrsint[1],2))
+
+#Intervalos de confianza
+intervalo_hrsint <- paste0("Intervalos: [", round(min_hrsint,2), ", ",
+                           round(max_hrsint,2),"]")
+
+#Error
+error_hrsint <- paste0("Error: ",round((max_hrsint - min_hrsint)/2,2))
+
+
+print(estimado_hrsint)
+print(intervalo_hrsint)
+print(error_hrsint)
+
+
+```
+
+### Gráfica 3: Horas promedio que pasan los mexicanos en internet al día
+
+```{r , include=TRUE, message = FALSE, warning= FALSE}
+#Graficamos primero la muestra.
+#Para graficos usamos el vector P7_4 ya que contiene los NA´s (como números) 
+#y para calculos de la media, varianza, etc. 
+#usamos el vector que creamos Tiempo_Internet que contiene 0 en vez de NA
+
+
+#Promedio de horas que usan internet las personas al día
+ggplot(Usuario) +
+  geom_boxplot(aes(y=P7_4),color = "black", fill = "#D3634F" ) +
+  theme_minimal() +
+  ggtitle("Horas diarias promedio que el usuario de la muestra pasa en internet") +
+  ylab("Horas")
+
+
+
+```
+
+### Gráfica 4: Horas diarias promedio que los mexicanos pasan en Internet
+```{r, include=TRUE}
+
+diseño_us <- svydesign(id = ~id, strata = ~EST_DIS, weights = ~FAC_PER,
+                    PSU = ~UPM, data = Usuario, nest=TRUE)
+#Media poblacional del tiempo que pasa en internet el usuario
+
+svyboxplot(P7_4~1,diseño_us,  col= "tomato3", 
+           main ="Horas diarias promedio que los mexicanos pasan en internet",
+           ylab = "Horas" )
+
+```
+
+
+
+### Gráfica 5: Distribución de la muestra del gasto mensual que hacen los mexicanos en celular 
+
+```{r setup , include=TRUE, message = FALSE, warning= FALSE}
+#Vamos a graficar la distribución del gasto mensual 
+#de la muestra que hacen los usuarios en celular.
+
+#Quitaremos el NO SABE = 9999, quitamos al unico usuario que gastaba 6000 para la gráfica
+Usuario <- Usuario %>%
+  mutate(P8_8 = ifelse(P8_8 == 9999 | P8_8 == 6000 ,0,P8_8))
+
+#Quitamos los NA y las sustituimos por
+#Usuario <- Usuario %>% dplyr::mutate(Gasto_cel = replace_na(P8_8, 0))
+
+
+ggplot(Usuario) +
+  geom_histogram(aes(x = P8_8, y = ..density..), fill = "#419C70",
+                 color = "white", 
+                 bins = 30) +
+  labs( title = "Distribución de la muestra del gasto mensual 
+        que hacen los mexicanos en celular",
+        x="Gasto en pesos")
+
+```
+
+### Gráfica 6: Distribución de gasto mensual que hacen los mexicanos en celular
+
+```{r, include=TRUE}
+#Quitamos el 9999 que es si contesta que NO SABE y el 6000 que sólo un usuario consume
+Usuario <- Usuario %>%
+  mutate(P8_8 = ifelse(P8_8 == 9999 | P8_8 == 6000 ,0,P8_8))
+
+diseño_us <- svydesign(id = ~id, strata = ~EST_DIS, weights = ~FAC_PER,
+                    PSU = ~UPM, data = Usuario, nest=TRUE)
+
+svyhist(~P8_8, diseño_us, main="Distribución de gasto mensual 
+        que hacen los mexicanos en celular", 
+        xlab = "Gasto en pesos", col = "#268758")
+
+
+```
+
+
+
+
+
+## CONCLUSIONES
+
+Podemos ver en los resultados de la ENSANUT 2019, que se ha tenido un gran avance en la proporción y el alcance de las herramientas tecnológicas y de comunicación que tienen ahora los mexicanos. Sin embargo, en este año de cuarentena en el que sería muy difícil hacer muchas actividades y labores sin acceso a energía eléctrica, internet, equipos electrónicos; nos damos cuenta de lo mucho que hace falta para que todos puedan desarrollarse en las mismas condiciones y oportunidades. Aunque a nivel poblacional las diferencias no son tan notables, a nivel geográfico son más notables y hacen referencia a las diferencias de ingresos e inversión tecnológica en la zona. 
+Este proyecto también, fue una gran oportunidad para darnos cuenta de lo importante que es hacer que la información esté disponible para todos, y aún más, que sea de fácil comprensión y visualización para cualquier persona incluso si no tiene conocimientos sobre estadística. Por lo que, hacer uso y aplicación de estos estimadores fue todo un reto y una enseñanza muy buena. 
+
+## GLOSARIO
+
+• Muestra: parte o cantidad pequeña de una cosa que se considera representativa del total y que se
+toma o se separa de ella con ciertos métodos para someterla a estudio, análisis o experimentación.
+
+• Muestreo polietápico: método que consiste en tomar muestras por etapas utilizando unidades de
+muestreo descendentes con el objetivo de hacer el proceso más práctico.
+
+• Marco muestral: lista de todos los elementos que componen el universo que queremos estudiar y de la cual se extrae la muestra.
+
+• Población objetivo: todo el grupo de personas u objetos que les interesan a los investigadores para la generalización de las conclusiones.
+
+• Estrato: conjunto de personas relacionadas que están ubicadas en un sitio o lugar similar dentro de alguna categoría en particular.
+
+• Error de estimación: valor absoluto de la diferencia entre una estimación particular y el valor del
+parámetro.
+
+• Estimador: una función de la muestra usado para estimar un parámetro desconocido de la población.
+
+• Intervalos de confianza: un par o varios pares de números entre los cuales se estima que estará cierto valor desconocido con un determinado nivel de confianza.
+
+• Muestreo aleatorio simple: un método de selección de n unidades sacadas de N, de tal manera que cada una de las muestras tienen la misma probabilidad de ser elegida
+
+• Muestreo aleatorio simple sin reemplazo: tipo de muestreo aleatorio simple, el elemento extraído de la población queda descartado de cara a la siguiente extracción. Es decir, un elemento sólo puede aparecer una vez en la muestra.
+
+
+## BIBLIOGRAFÍA
+
+INEGI. (2019). Encuesta Nacional sobre Disponibilidad y Uso de Tecnologías de la Información en los Hogares (ENDUTIH) 2019. Recuperado el 01 de diciembre de 2020, de: https://www.inegi.org.mx/programas/dutih/2019/#Documentacion
+
+INEGI. (2019). Diseño de la muestra (ENDUTIH) 2019. Recuperado el 01 de diciembre de 2020, de:   https://www.inegi.org.mx/contenido/productos/prod_serv/contenidos/espanol/bvinegi/productos/nueva_estruc/702825194352.pdf
+
+Ochoa, Carlos. (18 de mayo de 2015). Muestreo probabilístico: muestreo por conglomerados. Recuperado el 08 de diciembre de 2020, de: https://www.netquest.com/blog/es/blog/es/muestreo-probabilistico-muestreo-conglomerados
+
+Zepeda-Tello, R. (29 de octubre de 2020). Estadística I: Análisis exploratorio de datos y muestreo. Recuperado el 08 de Diciembre de 2020, de GitHub: Capítulo 6 Muestreo Aleatorio Multietápico | Estadística I: Análisis exploratorio de datos y muestreo (rodrigozepeda.github.io)
+
+Prof. Sánchez, Genaro. (año desconocido). LA ESTADÍSTICA APLICADA AL ANÁLISIS ECONÓMICO. Recuperado el 01 de diciembre de 2020, de: http://herzog.economia.unam.mx/profesor/barajas/estadis/parte4.pdf
+
+
+
+
+
+
+
+
+
+
+
+
+
